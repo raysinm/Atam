@@ -49,6 +49,7 @@ read_input:
   
   #return value:
   movq %rdx, %rax
+  shr $3, %rax
   ret
 
 hamming_weight:
@@ -76,7 +77,7 @@ hamming_weight:
 
 negate_first_k:
 	#codeword is in rdi
-	#len is in esi
+	#k is in esi
 	movq $0xffffffff, %r12 #initialize r12 to be 64 1 bits
 	sub %rdi, %r12  #r12 holds rdi with fliped bits
 	movq %r12, %rax  #moves return val to rax
@@ -98,14 +99,16 @@ is_balanced_loop_HW2:
 	call hamming_weight
 	cmp %rax, %r14
 	je end_knuth_HW2
-	cmp $64, %R13
+	cmp $63, %R13
 	je left_is_8_HW2:
 	inc %r13
+	xor %r12, %r12
+	jmp not_first_k_bits_loop_HW2
 
 left_is_8_HW2:
 	xor %r13, %r13
-	inc %r15
-	xor %r12, %r12 #12 is saved by callee - pg 30 tirgul 4
+	add %r15
+	xor %r12, %r12 #12 is saved by callee - pg 30 tirgul 4 - backup in callee!!!
 	
 not_first_k_bits_loop_HW2:
 	cmp %r12, %r15
@@ -115,18 +118,18 @@ not_first_k_bits_loop_HW2:
 	jmp is_balanced_loop_HW2
 
 not_first_k_bits_btyes_HW2:
-	#!!need to move 8 bytes of codeword to rdi place by %r12
+	lea codeword(,%r12,8), %rdi
 	movl $64, %esi
 	call negate_first_k
-	#!!move rax that holds changed codeword to codeword!!
+	movq %rax, (%rdi)
 	inc %r12
 	jmp not_first_k_bits_loop_HW2:
 	
 not_first_k_bits_left_HW2:
-	#!!need to move 8 bytes of codeword to rdi place by %r12 or %r15!!
+	lea codeword(,%r15,8), %rdi
 	movl %r13, %esi
 	call negate_first_k
-	#!!move rax that holds changed codeword to codeword!!
+	movq %rax, (%rdi)
 	jmp is_balanced_loop_HW2
 
 end_knuth_HW2:
