@@ -79,7 +79,9 @@ negate_first_k:
 	#codeword is in rdi
 	#k is in esi
 	movq $0xffffffff, %r12 #initialize r12 to be 64 1 bits
-	sub %rdi, %r12  #r12 holds rdi with fliped bits
+	shr %esi, %r12 #r12 is 1bits and k last bits are 0
+	not %r12
+	xor %rdi, %r12  #r12 holds rdi with k fliped bits
 	movq %r12, %rax  #moves return val to rax
 	
   ret
