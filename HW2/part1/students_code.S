@@ -8,9 +8,9 @@
 read_input:
   push %rbp
   movq %rsp, %rbp
-  subq $8, %rsp
-  
-  movq $path, %rdi
+  subq $8, %rsp #leaving place for mishtanim in the stack (to use for reading n)
+    
+  lea path(%rip), %rdi
   call get_path #now path contains file path
   #now we open
   movq $2, %rax
@@ -23,28 +23,28 @@ read_input:
   reading_first_number_loop_HW2:
   movq $0, %rax
   movq $1, %rdx
-  lea (%rbp, %rcx, -1), %rsi
+  lea (%rbp, %rcx), %rsi    #(trying to) save each char we read in the stack- specifically, in the place we gave for mishtanim
   push %rcx
   syscall
   pop %rcx
-  
-  cmpq $0xa, (%rbp, %rcx, -1) #comparing latest read character with "\n"
+  movb (%rbp, %rcx), %al
+  cmpb $0xa, %al #comparing latest read character with "\n"
   je continue_reading_HW2
-  inc %rcx
+  dec %rcx
   jmp reading_first_number_loop_HW2
   
   continue_reading_HW2:
-  movb $0, (%rbp, %rcx, -1) #null termination of the string
+  movb $0, (%rbp, %rcx) #null termination of the string
   push %rdi
-  movq $num, %rdi
+  movq %rbp, %rdi
   xor %rax, %rax
   call atam_atol
   movq %rax, %rdx
-  #now %rdx holds n
+  #now rdx holds n
   pop %rdi  #rdi once again holds file descriptor
   
   movq $0, %rax #?? dont remember what it does
-  movq $codeword, %rsi
+  lea codeword(%rip), %rsi
   syscall
  
   #closing the file:
@@ -62,12 +62,14 @@ hamming_weight:
   movq %rsp, %rbp
   #codeword adress is in rdi
   #len is in esi
-  movq $64, %rcx
+  mov %esi, %esi #for zero extension purposes
   xor %r9d, %r9d  #r9 counts 'len' loops 
+  xor %rax, %rax
   numbers_loop_HW2:
-  inc %r9d
-  movl (%rdi), %r8
-
+  xor %ecx, %ecx
+  inc %r9
+  lea (%rdi, %r9, 8), %rbx
+  movq (%rbx), %r8
       #count how many 1's in number
       while_loop_HW2:
       rorq %r8    #shift right in cycle
@@ -75,9 +77,10 @@ hamming_weight:
       inc %rax
     
       bit_is_not_1_HW2:
-      loop while_loop_HW2
+      cmpl $63, %ecx
+      jne while_loop_HW2
   
-  cmpq %r9d, %esi
+  cmpq %r9, %rsi
   jne numbers_loop_HW2
   leave
   ret
@@ -86,12 +89,20 @@ negate_first_k:
   pushq %rbp
   movq %rsp, %rbp
   #codeword is in rdi
-  #ks is in esi
-  movq $0xffffffff, %rcx #initialize rcx to be 64 1 bits
-  shr %esi, %rcx #rcx is 1bits and k last bits are 0
-  not %rcx
-  xor %rdi, %rcx  #rcx holds rdi with k fliped bits
-  movq %rcx, %rax  #moves return val to rcx
+  #k is in esi
+  movq (%rdi), %rdi
+  cmp $64, %esi
+  je k_is_64_HW2    #then we just "not" it as a whole
+  movb %sil, %cl    #moving k to cl for shr syntax
+  movq $0xffffffff, %rdx #initialize rdx to be 64 1 bits
+  shr %cl, %rdx #rdx is 1bits and k last bits are 0
+  not %rdx
+  xor %rdx, %rdi  #rdx holds rdi with k fliped bits
+  jmp negate_end_HW2
+  k_is_64_HW2:
+  not %rdi
+  negate_end_HW2:
+  movq %rdi, %rax  #moves return val to rcx
   leave
   ret
 
@@ -108,29 +119,31 @@ bring_balance_to_the_word:
   call read_input
   shl $2, %rax #n returns as n/8 so multiply it by 4
   movq %rax, %r14 #r14 holsd n/2 to compare to hamming weight
-  xor %r13, %r13 #counter for remainder bits to flip
-  xor %r15, %r15 #counter for bytes to flip
+  xor %r13, %r13 #counter for remainder bits to flip that dont belong to a full 8 byte row
+  xor %r15, %r15 #counter for bits to flip that belong to full 8 byte rows
+  
   
     is_balanced_loop_HW2:
       #codeword adress is in rdi
       #len is in esi
+      #movzx %esi, %rsi     #wont let me do it 32->64, i hope the zero extension has already happened (tirgul 2 page 19)
       push %rdi
-      push %esi
+      push %rsi
       call hamming_weight
+      pop %rsi
       pop %rdi
-      pop %esi
       cmp %rax, %r14
       je end_knuth_HW2
       cmp $63, %r13
-      je left_is_8_HW2:
+      je left_is_8_HW2
       inc %r13
       xor %r12, %r12
       jmp not_first_k_bits_loop_HW2
     
     left_is_8_HW2:
       xor %r13, %r13
-      add %r15
-      xor %r12, %r12 #12 is saved by callee - pg 30 tirgul 4 - backup in callee!!!
+      add $64, %r15
+      xor %r12, %r12 #counter for the full 8 byte rows we already sent to negate_first_k
     	
     not_first_k_bits_loop_HW2:
       cmp %r12, %r15
@@ -140,35 +153,36 @@ bring_balance_to_the_word:
       jmp is_balanced_loop_HW2
     
     not_first_k_bits_btyes_HW2:
-      lea codeword(,%r12,8), %rdi
-      movl $64, %esi
+      lea (%rdi,%r12), %rdi
+      movq $64, %rsi
       push %rdi
-      push %esi
+      push %rsi
       call negate_first_k
+      pop %rsi
       pop %rdi
-      pop %esi
+      
       movq %rax, (%rdi)
-      inc %r12
-      jmp not_first_k_bits_loop_HW2:
+      add $64, %r12
+      jmp not_first_k_bits_loop_HW2
     	
     not_first_k_bits_left_HW2:
-      lea codeword(,%r15,8), %rdi
-      movl %r13, %esi
+      lea (%rdi,%r15), %rdi
+      movq %r13, %rsi
       push %rdi
-      push %esi
+      push %rsi
       call negate_first_k
+      pop %rsi
       pop %rdi
-      pop %esi
+      
       movq %rax, (%rdi)
       jmp is_balanced_loop_HW2
     
     end_knuth_HW2:
-      shl $3, %r15 #multiply r15 by 8 to turn to bits
-      add %r13, %r15 #add r13 to %r15*8
+      add %r13, %r15 #add r13 to %r15
       movq %r15, %rax  #index to return
-      pop %r15
-      pop %r14
-      pop %r13
       pop %r12
+      pop %r13
+      pop %r14
+      pop %r15
       leave
       ret
