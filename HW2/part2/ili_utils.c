@@ -4,7 +4,7 @@ void my_store_idt(struct desc_ptr *idtr) {
 // <STUDENT FILL> - HINT: USE INLINE ASSEMBLY
 
 	asm("sidt %0;"
-	:"=m"(idtr)
+	:"=m"(*idtr)
 	:
 	:
 	);
