@@ -75,6 +75,9 @@ read_input:
 hamming_weight:
   push %rbp
   movq %rsp, %rbp
+  push %r8
+  push %r9
+  
   #codeword adress is in rdi
   #len is in esi
   mov %esi, %esi #for zero extension purposes
@@ -84,7 +87,6 @@ hamming_weight:
   numbers_loop_HW2:
   xor %ecx, %ecx
   lea (%rdi, %r9, 8), %rbx
-  debug1:
   movq (%rbx), %r8
   
       #count how many 1's in number
@@ -101,126 +103,173 @@ hamming_weight:
   inc %r9
   cmpq %r9, %rsi
   jne numbers_loop_HW2
+  
+
+  pop %r9
+  pop %r8
   leave
+  
   ret
 
 negate_first_k:
   pushq %rbp
   movq %rsp, %rbp
   #codeword is in rdi
-  #k is in esi
-  cmp $64, %esi
-  je k_is_64_HW2    #then we just "not" it as a whole
+  #k is in sil
+  #cmp $64, %esi
+  #je k_is_64_HW2    #then we just "not" it as a whole
   movb %sil, %cl    #moving k to cl for shr syntax
   movq $0xffffffffffffffff, %rdx #initialize rdx to be 64 1 bits
   shl %cl, %rdx #rdx is 1bits and k last bits are 0
   not %rdx
   xor %rdx, %rdi  #rdx holds rdi with k fliped bits
   jmp negate_end_HW2
-  k_is_64_HW2:
-  not %rdi
+  #k_is_64_HW2:
+  #not %rdi
   negate_end_HW2:
   movq %rdi, %rax  #moves return val to rcx
   leave
   ret
 
 bring_balance_to_the_word:
-  pushq %rbp
+  #codeword adress in rdi
+  #len in rsi
+  
+  push %rbp
   movq %rsp, %rbp
-  push %r15
-  push %r14
-  push %r13
-  push %r12
   
-  #codeword adress is in rdi 
-  #len is in esi 
-  push %rdi
-  push %rsi   
-  call read_input
-  pop %rsi
-  pop %rdi
-  #shl $3, %rax
-  movq %rax, %r14 #r14 will hold n/2 to compare to hamming weight  
-  shl $5, %r14 #n returns as n/8 so multiply it by 4, then turn it to bits multiply by 8
-  debug3:
-  #movq %rax, %rsi
-  xor %r13, %r13 #counter for remainder bits to flip that dont belong to a full 8 byte row
-  xor %r15, %r15 #counter for bits to flip that belong to full 8 byte rows
+  push %r8
+  push %r9
+  push %r10
+  xor %rbx, %rbx    #rbx counts index
+  xor %rcx, %rcx    #rcx holds number of k bits out of 64 in each iteration
+  xor %rdx, %rdx    #rdx holds number of 8byte portions we already passed
   
+  movq %rdi, %r10   #r10 holds backup of original codeword address
   
-    is_balanced_loop_HW2:
-      #codeword adress is in rdi
-      #len is in esi
-      #mov %esi, %esi #wont let me do it 32->64, i hope the zero extension has already happened (tirgul 2 page 19)
+  movq %rsi, %r8    #r8 holds number of 8-byte parts
+  movq %rsi, %r9
+  shl $3, %r9   #here r9 holds number of *bytes* in codeword
+  shl $3, %r9   #here r9 holds number of *bits* in codeword
+  shr $1, %r9   #now, finally r9 holds n/2 - the ideal hamming weight
+  
+  debug1:
+  
+  balance_loop_HW2:
+  
+      check_hamming_HW2:
       push %rdi
       push %rsi
-      call hamming_weight
-      pop %rsi
-      pop %rdi
-      debug2:
-      cmp %rax, %r14
-      je end_knuth_HW2
-      cmp $63, %r13
-      je left_is_8_HW2
-      inc %r13
-      xor %r12, %r12
-      jmp not_first_k_bits_loop_HW2
-    
-    left_is_8_HW2:
-      xor %r13, %r13
-      add $64, %r15
-      xor %r12, %r12 #counter for the full 8 byte rows we already sent to negate_first_k
-    	
-    not_first_k_bits_loop_HW2:
-      cmp %r12, %r15
-      jne not_first_k_bits_btyes_HW2
-      test %r13, %r13
-      jnz not_first_k_bits_left_HW2
-      jmp is_balanced_loop_HW2
-    
-    not_first_k_bits_btyes_HW2:
-      push %rdi
-      push %r12
-      shr $3, %r12
-      lea (%rdi,%r12), %rdi
-      pop %r12
-      push %rsi
-      movq $64, %rsi
+      push %rbx
+      push %rcx
+      push %rdx
       
-      push %rdi
-      call negate_first_k
-      pop %rdi
+      call hamming_weight
+      
+      pop %rdx
+      pop %rcx
+      pop %rbx
       pop %rsi
-
-      movq %rax, (%rdi)
       pop %rdi
-      add $64, %r12
-      jmp not_first_k_bits_loop_HW2
-    	
-    not_first_k_bits_left_HW2:
-      push %rdi
-      push %r15
-      shr $3, %r15    #going to use r15 as number of bytes and not bits
-      lea (%rdi,%r15), %rdi
-      pop %r15
-      push %rsi
-      movq %r13, %rsi
-      push %rdi
-      call negate_first_k
-      pop %rdi
-      pop %rsi
-    
-      movq %rax, (%rdi)
-      pop %rdi
-      jmp is_balanced_loop_HW2
-     
-    
-    end_knuth_HW2:
-      add %r13, %r15 #add r13 to %r15
-      movq %r15, %rax  #index to return
-      pop %r12
-      pop %r13
-      pop %r14
-      pop %r15
-      leave
-      ret
+      debug5:
+      
+      cmpq %rax, %r9 #checking if its balanced
+      je end_knuth_HW2 
+      jmp after_balance_check_HW2
+      
+          eight_bytes_loop_HW2:
+          #push %rdi
+          lea (%rdi, %rdx, 8), %r10
+          xor %rcx, %rcx
+          jmp bits_loop_HW2
+          
+              bits_loop_HW2:
+              inc %rcx
+              inc %rbx
+              
+              cmpq $64, %rcx
+              jne doing_not_on_k_bits_HW2
+              notq (%r10)
+              jmp negate_previous_portions_HW2
+              
+              
+                  doing_not_on_k_bits_HW2:
+                  push %rdi
+                  push %rsi
+                  push %rbx
+                  push %rcx
+                  push %rdx
+                          
+                  movq %r10, %rdi
+                  xor %rsi, %rsi
+                  movb %cl, %sil
+                  call negate_first_k
+                  movq %rax, (%r10)
+                 
+                  pop %rdx
+                  pop %rcx
+                  pop %rbx
+                  pop %rsi
+                  pop %rdi
+                  
+                  negate_previous_portions_HW2:
+                  cmpq $0, %rdx
+                  je negate_previous_portions_end_HW2
+                  push %rdx
+                  push %r10
+                  
+                      negate_previous_portions_loop_HW2:
+                      
+                      dec %rdx
+                      
+                      flip_portion_HW2:
+                      lea (%rdi, %rdx, 8), %r10
+                      notq (%r10)
+                      
+                      cmpq $0, %rdx
+                      jne negate_previous_portions_loop_HW2
+                  
+                  
+                  pop %r10
+                  pop %rdx
+                  cmpq $1, %r11
+                  negate_previous_portions_end_HW2:
+                  je negate_back_end_HW2
+              
+              
+              jmp check_hamming_HW2
+              
+              after_balance_check_HW2:
+              cmpq $0, %rdx
+              je negate_back_end_HW2
+              negate_back_HW2:
+              movq $1, %r11
+              jmp doing_not_on_k_bits_HW2
+              negate_back_end_HW2:
+              movq $0, %r11
+              
+              
+              debug2:
+              
+              cmpq $64, %rcx
+              jne bits_loop_HW2
+              je next_8byte_portion_HW2
+              
+          
+          next_8byte_portion_HW2:
+          
+          inc %rdx  #next 8byte portion
+          cmpq %rdx, %r8    #checking we're not outside of codeword
+          je end_knuth_HW2
+          jmp eight_bytes_loop_HW2
+          #pop %rdi
+  
+  end_knuth_HW2: 
+  debug4:
+  movq %rbx, %rax   #returning index
+  pop %r10
+  pop %r9
+  pop %r8
+  leave
+  ret
+  
