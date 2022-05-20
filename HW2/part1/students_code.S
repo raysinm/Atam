@@ -141,6 +141,7 @@ bring_balance_to_the_word:
   push %r8
   push %r9
   push %r10
+  push %r12
   xor %rbx, %rbx    #rbx counts index
   xor %rcx, %rcx    #rcx holds number of k bits out of 64 in each iteration
   xor %rdx, %rdx    #rdx holds number of 8byte portions we already passed
@@ -172,23 +173,18 @@ bring_balance_to_the_word:
       pop %rsi
       pop %rdi
       debug5:
-      
       cmpq %rax, %r9 #checking if its balanced
       je end_knuth_HW2 
       jmp after_balance_check_HW2
       
-          eight_bytes_loop_HW2:
-          #push %rdi
-          lea (%rdi, %rdx, 8), %r10
-          xor %rcx, %rcx
-          jmp bits_loop_HW2
-          
+       
               bits_loop_HW2:
               inc %rcx
               inc %rbx
               
               cmpq $64, %rcx
               jne doing_not_on_k_bits_HW2
+              lea (%rdi, %rdx, 8), %r10 #stav moved here
               notq (%r10)
               jmp negate_previous_portions_HW2
               
@@ -200,7 +196,7 @@ bring_balance_to_the_word:
                   push %rcx
                   push %rdx
                           
-                  movq %r10, %rdi
+                  movq (%r10), %rdi #neg needs codeword and not address
                   xor %rsi, %rsi
                   movb %cl, %sil
                   call negate_first_k
@@ -232,15 +228,18 @@ bring_balance_to_the_word:
                   
                   pop %r10
                   pop %rdx
-                  cmpq $1, %r11
                   negate_previous_portions_end_HW2:
+                  cmpq $1, %r11
                   je negate_back_end_HW2
               
               
               jmp check_hamming_HW2
               
               after_balance_check_HW2:
-              cmpq $0, %rdx
+              xor %r12, %r12
+              add %rdx, %r12
+              add %rcx, %r12
+              cmpq $0, %r12
               je negate_back_end_HW2
               negate_back_HW2:
               movq $1, %r11
@@ -261,12 +260,15 @@ bring_balance_to_the_word:
           inc %rdx  #next 8byte portion
           cmpq %rdx, %r8    #checking we're not outside of codeword
           je end_knuth_HW2
-          jmp eight_bytes_loop_HW2
+          xor %rcx, %rcx
+          inc %rbx
+          jmp negate_previous_portions_HW2
           #pop %rdi
   
   end_knuth_HW2: 
   debug4:
   movq %rbx, %rax   #returning index
+  pop %r12
   pop %r10
   pop %r9
   pop %r8
