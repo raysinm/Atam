@@ -154,8 +154,6 @@ bring_balance_to_the_word:
   shl $3, %r9   #here r9 holds number of *bits* in codeword
   shr $1, %r9   #now, finally r9 holds n/2 - the ideal hamming weight
   
-  debug1:
-  
   balance_loop_HW2:
   
       check_hamming_HW2:
@@ -172,7 +170,6 @@ bring_balance_to_the_word:
       pop %rbx
       pop %rsi
       pop %rdi
-      debug5:
       cmpq %rax, %r9 #checking if its balanced
       je end_knuth_HW2 
       jmp after_balance_check_HW2
@@ -181,10 +178,9 @@ bring_balance_to_the_word:
               bits_loop_HW2:
               inc %rcx
               inc %rbx
-              
               cmpq $64, %rcx
-              jne doing_not_on_k_bits_HW2
               lea (%rdi, %rdx, 8), %r10 #stav moved here
+              jne doing_not_on_k_bits_HW2
               notq (%r10)
               jmp negate_previous_portions_HW2
               
@@ -195,7 +191,7 @@ bring_balance_to_the_word:
                   push %rbx
                   push %rcx
                   push %rdx
-                          
+                   
                   movq (%r10), %rdi #neg needs codeword and not address
                   xor %rsi, %rsi
                   movb %cl, %sil
@@ -232,7 +228,7 @@ bring_balance_to_the_word:
                   cmpq $1, %r11
                   je negate_back_end_HW2
               
-              
+              debugs1:
               jmp check_hamming_HW2
               
               after_balance_check_HW2:
@@ -245,11 +241,8 @@ bring_balance_to_the_word:
               movq $1, %r11
               jmp doing_not_on_k_bits_HW2
               negate_back_end_HW2:
+              debugs3:
               movq $0, %r11
-              
-              
-              debug2:
-              
               cmpq $64, %rcx
               jne bits_loop_HW2
               je next_8byte_portion_HW2
